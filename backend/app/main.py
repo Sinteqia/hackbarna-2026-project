@@ -1,17 +1,26 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from app.models import (
     DemoOptimizeResponse,
     ForecastResponse,
     OptimizeRequest,
     OptimizeResponse,
+    ReplanRequest,
+    ReplanResponse,
     ScheduleInput,
     ValidateRequest,
     ValidationResult,
+    WorkerStatus,
 )
 from app.services.heat_risk import build_windows
 from app.services.optimization import run_optimization
-from app.services.scenario import load_baseline_context, load_scenario
+from app.services.replan import run_replan
+from app.services.scenario import (
+    UnknownWorkerError,
+    load_baseline_context,
+    load_scenario,
+    worker_roster,
+)
 from app.services.scheduler import find_heat_conflicts, schedule
 from app.services.validator import validate_schedule
 from app.services.weather import get_forecast
@@ -49,11 +58,31 @@ def demo_optimize() -> DemoOptimizeResponse:
     )
 
 
+@app.get("/scenarios/{scenario}/workers", response_model=list[WorkerStatus])
+def scenario_workers(scenario: str) -> list[WorkerStatus]:
+    """Safe worker metadata (id, name, skills, availability) of a backend-owned scenario, so the
+    UI can show the operational worker table before any optimization has run."""
+    try:
+        return worker_roster(load_scenario(scenario))
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown scenario {scenario!r}") from None
+
+
 @app.post("/optimize", response_model=OptimizeResponse)
 def optimize(request: OptimizeRequest) -> OptimizeResponse:
     """Frontend-facing flow. The backend owns workers/tasks/plan/risk windows; the client only
     names a scenario. Solver output is independently validated before being exposed."""
     return run_optimization(load_scenario(request.scenario))
+
+
+@app.post("/replan", response_model=ReplanResponse)
+def replan(request: ReplanRequest) -> ReplanResponse:
+    """Apply a supported synthetic operational event (worker_unavailable) to the backend-owned
+    baseline context, then replan with OR-Tools and independently validate the result."""
+    try:
+        return run_replan(request.scenario, request.event)
+    except UnknownWorkerError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/validate", response_model=ValidationResult)

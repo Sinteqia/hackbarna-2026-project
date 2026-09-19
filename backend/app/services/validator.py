@@ -116,10 +116,15 @@ def validate_schedule(
         # H1 worker availability: the whole assignment inside the worker's availability
         av_from, av_to = _minutes(worker.available_from), _minutes(worker.available_to)
         if av_from is None or av_to is None or a.start < av_from or a.end > av_to:
-            add("H1", "OUTSIDE_AVAILABILITY",
-                f"{worker.name} is available {worker.available_from}-{worker.available_to}, "
-                f"but {task.name} is scheduled {a.start // 60:02d}:{a.start % 60:02d}-{a.end // 60:02d}:{a.end % 60:02d}",
-                task_id=a.task_id, worker_id=a.worker_id)
+            when = f"{a.start // 60:02d}:{a.start % 60:02d}-{a.end // 60:02d}:{a.end % 60:02d}"
+            if av_from is not None and av_to is not None and av_to <= av_from:  # empty availability
+                message = f"{worker.name} is unavailable, but {task.name} is scheduled {when}"
+            else:
+                message = (
+                    f"{worker.name} is available {worker.available_from}-{worker.available_to}, "
+                    f"but {task.name} is scheduled {when}"
+                )
+            add("H1", "OUTSIDE_AVAILABILITY", message, task_id=a.task_id, worker_id=a.worker_id)
 
         # H2 skill match
         if task.required_skill not in worker.skills:

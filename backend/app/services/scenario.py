@@ -5,10 +5,10 @@ Risk windows are produced by the T1 engine (`build_windows`) - no thresholds are
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.demo_data import CURRENT_PLAN, DATA_LABEL, TASKS, WORKERS
-from app.models import RiskContext, ScheduledTask, Task, Worker
+from app.models import RiskContext, ScheduledTask, Task, Worker, WorkerStatus
 from app.services.heat_risk import build_windows
 from app.services.weather import get_forecast
 
@@ -42,6 +42,42 @@ def load_baseline_context() -> OperationalContext:
             windows=build_windows(weather.hours),
         ),
     )
+
+
+# "Unavailable" = empty availability window, so the existing H1 mechanism (solver and independent
+# validator) applies unchanged. No reason is stored.
+UNAVAILABLE_WINDOW = ("00:00", "00:00")
+
+
+def worker_roster(context: OperationalContext) -> list[WorkerStatus]:
+    """Safe presentation metadata for the workers of a scenario (single source for all responses)."""
+    return [
+        WorkerStatus(id=w.id, name=w.name, skills=list(w.skills), available=is_worker_available(w))
+        for w in context.workers
+    ]
+
+
+class UnknownWorkerError(ValueError):
+    """The event names a worker that does not exist in the backend-owned scenario."""
+
+
+def is_worker_available(worker: Worker) -> bool:
+    return worker.available_from < worker.available_to  # empty window == unavailable
+
+
+def apply_worker_unavailable(
+    context: OperationalContext, worker_id: str, current_plan: list[ScheduledTask]
+) -> OperationalContext:
+    """Return a NEW context in which `worker_id` cannot be assigned work; the input is untouched.
+    `current_plan` becomes the plan in force (the previously validated one)."""
+    if worker_id not in {w.id for w in context.workers}:
+        raise UnknownWorkerError(f"Unknown worker {worker_id!r}")
+    start, end = UNAVAILABLE_WINDOW
+    workers = [
+        w.model_copy(update={"available_from": start, "available_to": end}) if w.id == worker_id else w
+        for w in context.workers
+    ]
+    return replace(context, workers=workers, current_plan=list(current_plan))
 
 
 SCENARIOS: dict[str, Callable[[], OperationalContext]] = {"baseline": load_baseline_context}

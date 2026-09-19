@@ -1,7 +1,17 @@
 // SYNTHETIC DEMO DATA: pre-click presentation of the baseline scenario, matching the backend's
 // demo current plan. After POST /optimize returns, the UI uses the backend response instead.
 
-import type { HeatWindow, ScheduledTask } from "./types";
+import type { HeatWindow, ScheduledTask, WorkerStatus } from "./types";
+
+// Display-only FALLBACK roster, used only if GET /api/workers (backend metadata) is unreachable.
+// Controls are disabled until a backend-validated baseline arrives, and the backend roster
+// (`response.workers`) always replaces this, so it is never authoritative.
+export const BASELINE_WORKERS: WorkerStatus[] = [
+  { id: "w_marc", name: "Marc", skills: ["GENERAL"], available: true },
+  { id: "w_laura", name: "Laura", skills: ["ELECTRICAL"], available: true },
+  { id: "w_joan", name: "Joan", skills: ["GENERAL"], available: true },
+  { id: "w_alex", name: "Alex", skills: ["CONCRETE"], available: true },
+];
 
 const task = (
   task_id: string,

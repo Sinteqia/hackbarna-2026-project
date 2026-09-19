@@ -183,10 +183,22 @@ class RiskContext(BaseModel):
     windows: list[HeatRiskWindow]
 
 
+class WorkerStatus(BaseModel):
+    """Backend-owned SAFE worker metadata for presentation: id, display name, skills and current
+    availability. `available` is False when the worker cannot be assigned. Availability windows
+    and other scheduling constraints are deliberately not exposed."""
+
+    id: str
+    name: str
+    skills: list[str]
+    available: bool
+
+
 class OptimizeResponse(BaseModel):
     scenario: str
     data_label: str
     risk: RiskContext
+    workers: list[WorkerStatus]
     current_plan: list[ScheduledTask]
     current_plan_conflicts: list[HeatConflict]
     current_plan_validation: ValidationResult
@@ -198,6 +210,42 @@ class OptimizeResponse(BaseModel):
     changes: list[Change]
     validation: ValidationResult | None = None  # None when the solver produced no candidate
     message: str | None = None
+
+
+# --- Dynamic replanning (T6). The client names a supported event; the backend applies it. ---
+
+
+class WorkerUnavailableEvent(BaseModel):
+    """Synthetic operational event: the operator marks a worker unavailable. No reason is
+    modelled or stored. `worker_id` is validated at runtime against the backend-owned scenario
+    (unknown ids -> 422), so there is no duplicated allowlist."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["worker_unavailable"]
+    worker_id: str
+
+
+class ReplanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario: Literal["baseline"]
+    event: WorkerUnavailableEvent
+
+
+class AppliedEvent(BaseModel):
+    type: str
+    worker_id: str
+    worker_name: str
+    description: str
+
+
+class ReplanResponse(OptimizeResponse):
+    """Same shape as OptimizeResponse, evaluated under the UPDATED context:
+    `current_plan` is the previously validated plan, `current_plan_validation` is that plan
+    re-validated under the updated context, and `schedule`/`validation` are the replan."""
+
+    event: AppliedEvent
 
 
 class DemoOptimizeResponse(BaseModel):

@@ -55,10 +55,25 @@ export interface ValidationResult {
   hard_constraints_checked: string[];
 }
 
+export interface AppliedEvent {
+  type: string;
+  worker_id: string;
+  worker_name: string;
+  description: string;
+}
+
+export interface WorkerStatus {
+  id: string;
+  name: string;
+  skills: string[];
+  available: boolean; // false once the operator marked the worker unavailable
+}
+
 export interface OptimizeResponse {
   scenario: string;
   data_label: string;
   risk: { source: string; description: string; windows: HeatWindow[] };
+  workers: WorkerStatus[]; // backend-owned roster
   current_plan: ScheduledTask[];
   current_plan_conflicts: HeatConflict[];
   current_plan_validation: ValidationResult;
@@ -69,4 +84,10 @@ export interface OptimizeResponse {
   changes: Change[];
   validation: ValidationResult | null;
   message: string | null;
+}
+
+// POST /replan: same shape, evaluated under the UPDATED context. `current_plan` is the previously
+// validated plan and `current_plan_validation` is that plan re-validated under the new context.
+export interface ReplanResponse extends OptimizeResponse {
+  event: AppliedEvent;
 }

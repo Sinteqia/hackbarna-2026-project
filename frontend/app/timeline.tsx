@@ -9,11 +9,19 @@ interface Props {
   plan: ScheduledTask[];
   order: string[]; // task ids, so both timelines keep the same row order
   conflictIds?: Set<string>;
-  changedIds?: Set<string>; // when provided, unchanged rows are tagged UNCHANGED
+  conflictLabel?: string; // tag for rows in conflictIds (default H5 CONFLICT)
+  changeLabels?: Map<string, string>; // task_id -> tag; when provided, other rows read UNCHANGED
   hotWindows: HeatWindow[];
 }
 
-export default function Timeline({ plan, order, conflictIds, changedIds, hotWindows }: Props) {
+export default function Timeline({
+  plan,
+  order,
+  conflictIds,
+  conflictLabel = "H5 CONFLICT",
+  changeLabels,
+  hotWindows,
+}: Props) {
   const start = 7 * 60;
   const end = Math.max(17 * 60, Math.ceil(Math.max(...plan.map((p) => toMin(p.end))) / 60) * 60);
   const pct = (m: number) => `${(Math.min(Math.max(m, start), end) - start) / (end - start) * 100}%`;
@@ -47,7 +55,7 @@ export default function Timeline({ plan, order, conflictIds, changedIds, hotWind
       </div>
       {rows.map((p) => {
         const conflict = conflictIds?.has(p.task_id);
-        const changed = changedIds?.has(p.task_id);
+        const changed = changeLabels?.has(p.task_id);
         const bar = conflict
           ? "bg-red-600 ring-2 ring-red-300"
           : changed
@@ -62,16 +70,16 @@ export default function Timeline({ plan, order, conflictIds, changedIds, hotWind
               </div>
               {conflict && (
                 <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">
-                  H5 CONFLICT
+                  {conflictLabel}
                 </span>
               )}
-              {!conflict && changedIds && (
+              {!conflict && changeLabels && (
                 <span
                   className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${
                     changed ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-500"
                   }`}
                 >
-                  {changed ? "MOVED" : "UNCHANGED"}
+                  {changed ? changeLabels.get(p.task_id) : "UNCHANGED"}
                 </span>
               )}
             </div>

@@ -7,7 +7,7 @@ A candidate is only exposed as a schedule when the validator accepts it.
 from collections.abc import Callable
 
 from app.models import OptimizeResponse, ScheduleInput
-from app.services.scenario import OperationalContext
+from app.services.scenario import OperationalContext, worker_roster
 from app.services.scheduler import find_heat_conflicts, schedule
 from app.services.validator import validate_schedule
 
@@ -42,6 +42,7 @@ def run_optimization(
         scenario=context.scenario,
         data_label=context.data_label,
         risk=context.risk,
+        workers=worker_roster(context),
         current_plan=context.current_plan,
         current_plan_conflicts=find_heat_conflicts(context.current_plan, context.tasks, windows),
         current_plan_validation=current_validation,
