@@ -22,6 +22,8 @@ from app.services.heat_risk import build_windows
 from app.services.optimization import run_optimization
 from app.services.rejection import (
     AssignmentNotInCandidateError,
+    DuplicateRejectionError,
+    NoCandidateError,
     UnknownTaskError,
     run_assignment_rejection,
 )
@@ -99,12 +101,17 @@ def optimize(request: OptimizeRequest) -> OptimizeResponse:
 
 @app.post("/replan/assignment-rejection", response_model=AssignmentRejectionResponse)
 def replan_assignment_rejection(request: AssignmentRejectionRequest) -> AssignmentRejectionResponse:
-    """A worker declined ONE proposed assignment ("NOT"). The backend forbids only that
-    worker+task pair (H10), replans with OR-Tools and independently validates the result.
-    Unknown worker/task, or a pair that is not in the proposed plan, is rejected (422)."""
+    """A worker declined a proposed assignment ("NOT"). Send either one `rejected_assignment` or an
+    ordered `rejection_history`; the server replays the rounds from the baseline, forbids only the
+    rejected worker+task pairs (H10, cumulative), replans with OR-Tools and independently validates
+    the result. Unknown worker/task, a duplicate, or a pair that is not in that round's candidate
+    is rejected (422)."""
     try:
-        return run_assignment_rejection(request.scenario, request.rejected_assignment)
-    except (UnknownWorkerError, UnknownTaskError, AssignmentNotInCandidateError) as exc:
+        return run_assignment_rejection(request.scenario, request.rejections())
+    except (
+        UnknownWorkerError, UnknownTaskError, AssignmentNotInCandidateError,
+        DuplicateRejectionError, NoCandidateError,
+    ) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 

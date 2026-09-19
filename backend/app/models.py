@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Risk(str, Enum):
@@ -325,14 +325,35 @@ class ReplanResponse(OptimizeResponse):
 # --- Assignment rejection ("NOT" from a worker) -> trusted replanning ---
 
 
+MAX_REJECTION_HISTORY = 10  # bounds the server-side replay (one solve per round)
+
+
 class AssignmentRejectionRequest(BaseModel):
-    """The client names ONE proposed assignment to reject. No schedule, constraints or worker/task
-    metadata are accepted: everything is resolved from backend-owned data."""
+    """The client names the rejected assignment(s). No schedule, constraints or worker/task
+    metadata are accepted: everything is resolved from backend-owned data.
+
+    Exactly one of:
+      * `rejected_assignment`: a single rejection against the baseline candidate (original form);
+      * `rejection_history`: ORDERED cumulative rejections. The server replays them from the
+        baseline: each pair must exist in the candidate produced by the previous rounds.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     scenario: Literal["baseline"]
-    rejected_assignment: RejectedAssignment
+    rejected_assignment: RejectedAssignment | None = None
+    rejection_history: list[RejectedAssignment] | None = Field(
+        default=None, min_length=1, max_length=MAX_REJECTION_HISTORY
+    )
+
+    @model_validator(mode="after")
+    def _exactly_one_form(self) -> "AssignmentRejectionRequest":
+        if (self.rejected_assignment is None) == (self.rejection_history is None):
+            raise ValueError("provide exactly one of rejected_assignment or rejection_history")
+        return self
+
+    def rejections(self) -> list[RejectedAssignment]:
+        return [self.rejected_assignment] if self.rejected_assignment else list(self.rejection_history or [])
 
 
 class AppliedRejection(BaseModel):
@@ -348,9 +369,11 @@ class AppliedRejection(BaseModel):
 class AssignmentRejectionResponse(OptimizeResponse):
     """OptimizeResponse for the replanning that forbids the rejected worker+task pair.
     `current_plan` is the candidate that was rejected; `current_plan_validation` re-validates it
-    (it violates H10 by construction); `schedule`/`validation` are the new plan."""
+    (it violates H10 by construction); `schedule`/`validation` are the new plan.
+    `rejection` is the LAST rejection; `rejection_history` lists every round applied, in order."""
 
     rejection: AppliedRejection
+    rejection_history: list[AppliedRejection]
 
 
 # --- Norrsken / Deepfire wildfire signal (configured operational rule, not a safety statement) ---
