@@ -1,0 +1,34 @@
+// SYNTHETIC DEMO DATA: pre-click presentation of the baseline scenario, matching the backend's
+// demo current plan. After POST /optimize returns, the UI uses the backend response instead.
+
+import type { HeatWindow, ScheduledTask } from "./types";
+
+const task = (
+  task_id: string,
+  task_name: string,
+  worker_name: string,
+  start: string,
+  end: string,
+): ScheduledTask => ({
+  task_id,
+  task_name,
+  worker_id: worker_name.toLowerCase(),
+  worker_name,
+  start,
+  end,
+});
+
+export const BASELINE_PLAN: ScheduledTask[] = [
+  task("t_unload", "Material unloading", "Marc", "08:00", "09:00"),
+  task("t_concrete", "Concrete pouring", "Alex", "11:00", "13:00"),
+  task("t_electrical", "Electrical installation", "Laura", "12:00", "14:00"),
+  task("t_assembly", "Outdoor assembly", "Marc", "14:00", "16:00"),
+  task("t_docs", "Documentation", "Joan", "16:00", "17:00"),
+];
+
+// Outdoor high-intensity tasks overlapping the HIGH window in the baseline plan.
+export const BASELINE_CONFLICT_IDS = ["t_concrete", "t_assembly"];
+
+export const BASELINE_HOT_WINDOWS: HeatWindow[] = [
+  { from: "12:00", to: "16:00", risk: "HIGH", constraints: { outdoor_high_intensity_allowed: false } },
+];
