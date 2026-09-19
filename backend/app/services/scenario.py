@@ -10,6 +10,7 @@ from dataclasses import dataclass, replace
 from app.demo_data import COMPANY, CURRENT_PLAN, DATA_LABEL, SITE, TASKS, WORKERS, ZONES
 from app.models import (
     Company,
+    RejectedAssignment,
     RiskContext,
     ScheduledTask,
     Site,
@@ -38,6 +39,8 @@ class OperationalContext:
     risk: RiskContext  # environmental risk windows for `site`
     # None = no wildfire assessment took part; a list (maybe empty) = it did (H9 is then checked).
     wildfire_restrictions: list[WildfireRestriction] | None = None
+    # None = no assignment rejection took part; a list = it did (H10 is then checked).
+    rejected_assignments: list[RejectedAssignment] | None = None
 
 
 def load_baseline_context() -> OperationalContext:

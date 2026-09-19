@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 
 from app.demo_data import SITE
 from app.models import (
+    AssignmentRejectionRequest,
+    AssignmentRejectionResponse,
     DemoOptimizeResponse,
     ForecastResponse,
     OptimizeRequest,
@@ -18,6 +20,11 @@ from app.models import (
 )
 from app.services.heat_risk import build_windows
 from app.services.optimization import run_optimization
+from app.services.rejection import (
+    AssignmentNotInCandidateError,
+    UnknownTaskError,
+    run_assignment_rejection,
+)
 from app.services.replan import run_replan
 from app.services.scenario import (
     UnknownWorkerError,
@@ -88,6 +95,17 @@ def optimize(request: OptimizeRequest) -> OptimizeResponse:
     """Frontend-facing flow. The backend owns workers/tasks/plan/risk windows; the client only
     names a scenario. Solver output is independently validated before being exposed."""
     return run_optimization(load_scenario(request.scenario))
+
+
+@app.post("/replan/assignment-rejection", response_model=AssignmentRejectionResponse)
+def replan_assignment_rejection(request: AssignmentRejectionRequest) -> AssignmentRejectionResponse:
+    """A worker declined ONE proposed assignment ("NOT"). The backend forbids only that
+    worker+task pair (H10), replans with OR-Tools and independently validates the result.
+    Unknown worker/task, or a pair that is not in the proposed plan, is rejected (422)."""
+    try:
+        return run_assignment_rejection(request.scenario, request.rejected_assignment)
+    except (UnknownWorkerError, UnknownTaskError, AssignmentNotInCandidateError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/wildfire/optimize", response_model=WildfireOptimizeResponse)

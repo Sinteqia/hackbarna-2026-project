@@ -18,14 +18,20 @@ def run_optimization(
     validator_fn: Callable = validate_schedule,
 ) -> OptimizeResponse:
     windows = context.risk.windows
-    # H9 is passed to the validator only when a wildfire assessment took part (baseline: unchanged).
-    extra = {} if context.wildfire_restrictions is None else {"wildfire_restrictions": context.wildfire_restrictions}
+    # H9 / H10 are passed to the validator only when a wildfire assessment / an assignment rejection
+    # took part (baseline: unchanged).
+    extra: dict = {}
+    if context.wildfire_restrictions is not None:
+        extra["wildfire_restrictions"] = context.wildfire_restrictions
+    if context.rejected_assignments is not None:
+        extra["rejected_assignments"] = context.rejected_assignments
     current_validation = validator_fn(context.current_plan, context.workers, context.tasks, windows, **extra)
     result = scheduler_fn(
         ScheduleInput(
             workers=context.workers, tasks=context.tasks,
             heat_windows=windows, current_plan=context.current_plan,
             wildfire_restrictions=context.wildfire_restrictions or [],
+            rejected_assignments=context.rejected_assignments or [],
         )
     )
 

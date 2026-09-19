@@ -166,6 +166,11 @@ def schedule(data: ScheduleInput) -> ScheduleResult:
                 model.Add(start + d <= a).OnlyEnforceIf(before)
                 model.Add(start >= b).OnlyEnforceIf(before.Not())
 
+    for rej in data.rejected_assignments:  # H10: forbid ONLY this worker+task pair (not the worker)
+        literal = assign.get((rej.task_id, rej.worker_id))
+        if literal is not None:
+            model.Add(literal == 0)
+
     for t in data.tasks:  # H4
         for dep in t.dependencies:
             dep_task = next(x for x in data.tasks if x.id == dep)

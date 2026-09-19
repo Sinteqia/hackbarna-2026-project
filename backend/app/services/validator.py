@@ -18,6 +18,7 @@ from app.models import (
     Intensity,
     ScheduledTask,
     Task,
+    RejectedAssignment,
     ValidationResult,
     ValidationViolation,
     WildfireRestriction,
@@ -52,9 +53,11 @@ def validate_schedule(
     tasks: list[Task],
     heat_windows: list[HeatRiskWindow],
     wildfire_restrictions: list[WildfireRestriction] | None = None,
+    rejected_assignments: list[RejectedAssignment] | None = None,
 ) -> ValidationResult:
     """`wildfire_restrictions=None` means no wildfire assessment took part (H9 not checked);
-    a list (possibly empty) means it did, so H9 is reported as checked."""
+    a list (possibly empty) means it did, so H9 is reported as checked. Likewise
+    `rejected_assignments` (H10): a list means a rejection took part in this request."""
     violations: list[ValidationViolation] = []
 
     def add(constraint: str, code: str, message: str, task_id=None, worker_id=None) -> None:
@@ -178,6 +181,14 @@ def validate_schedule(
                         f"{restriction.from_time}-{restriction.to_time}",
                         task_id=a.task_id, worker_id=a.worker_id)
 
+        # H10 rejected assignment (only when a rejection took part): a declined worker+task pair
+        # must not appear in the candidate. It concerns this pair only, nothing else about the worker.
+        for rejected in rejected_assignments or []:
+            if a.task_id == rejected.task_id and a.worker_id == rejected.worker_id:
+                add("H10", "REJECTED_ASSIGNMENT_PRESENT",
+                    f"{worker.name} declined {task.name} for this replanning, but it is still assigned",
+                    task_id=a.task_id, worker_id=a.worker_id)
+
     # H3 required workers: distinct workers per task
     for task_id, group in by_task.items():
         distinct = len({a.worker_id for a in group})
@@ -215,5 +226,7 @@ def validate_schedule(
     return ValidationResult(
         valid=not violations,
         violations=violations,
-        hard_constraints_checked=list(HARD_CONSTRAINTS) + (["H9"] if wildfire_restrictions is not None else []),
+        hard_constraints_checked=list(HARD_CONSTRAINTS)
+        + (["H9"] if wildfire_restrictions is not None else [])
+        + (["H10"] if rejected_assignments is not None else []),
     )

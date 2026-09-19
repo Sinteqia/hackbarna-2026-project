@@ -130,11 +130,23 @@ class WildfireRestriction(BaseModel):
     rule: str = ""  # human-readable description of the configured rule
 
 
+class RejectedAssignment(BaseModel):
+    """ONE specific proposed assignment a worker declined: this worker must not perform this task
+    in this replanning. It is NOT unavailability for the day and says nothing about the worker
+    (no reason is recorded)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    worker_id: str
+    task_id: str
+
+
 class ScheduleInput(BaseModel):
     workers: list[Worker]
     tasks: list[Task]
     heat_windows: list[HeatRiskWindow]  # produced by the T1 Heat Risk Engine
     wildfire_restrictions: list[WildfireRestriction] = []  # H9; empty = none applied
+    rejected_assignments: list[RejectedAssignment] = []  # H10; empty = none
     current_plan: list[ScheduledTask] = []
 
 
@@ -308,6 +320,37 @@ class ReplanResponse(OptimizeResponse):
     re-validated under the updated context, and `schedule`/`validation` are the replan."""
 
     event: AppliedEvent
+
+
+# --- Assignment rejection ("NOT" from a worker) -> trusted replanning ---
+
+
+class AssignmentRejectionRequest(BaseModel):
+    """The client names ONE proposed assignment to reject. No schedule, constraints or worker/task
+    metadata are accepted: everything is resolved from backend-owned data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scenario: Literal["baseline"]
+    rejected_assignment: RejectedAssignment
+
+
+class AppliedRejection(BaseModel):
+    worker_id: str
+    worker_name: str
+    task_id: str
+    task_name: str
+    start: str  # where the rejected assignment sat in the candidate plan
+    end: str
+    description: str
+
+
+class AssignmentRejectionResponse(OptimizeResponse):
+    """OptimizeResponse for the replanning that forbids the rejected worker+task pair.
+    `current_plan` is the candidate that was rejected; `current_plan_validation` re-validates it
+    (it violates H10 by construction); `schedule`/`validation` are the new plan."""
+
+    rejection: AppliedRejection
 
 
 # --- Norrsken / Deepfire wildfire signal (configured operational rule, not a safety statement) ---
