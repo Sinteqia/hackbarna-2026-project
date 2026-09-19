@@ -5,6 +5,7 @@ import { BASELINE_CONFLICT_IDS, BASELINE_HOT_WINDOWS, BASELINE_PLAN, BASELINE_WO
 import { changeLabels, classify } from "@/lib/optimize";
 import type { OptimizeResponse, ReplanResponse, SiteView, WorkerStatus } from "@/lib/types";
 import Timeline from "./timeline";
+import WildfireCard from "./wildfire-card";
 import WorkersTable from "./workers-table";
 
 type Phase<T> =
@@ -257,7 +258,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-[minmax(0,1fr)_400px] gap-4">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           <Card
             title={replanMode ? "Previous validated plan" : "Current plan"}
             badge={
@@ -297,11 +298,13 @@ export default function Dashboard() {
                 hotWindows={hotWindows}
               />
             ) : (
-              <div className="flex h-44 items-center justify-center rounded border border-dashed border-slate-300 text-slate-500">
+              <div className="flex h-28 items-center justify-center rounded border border-dashed border-slate-300 text-slate-500">
                 {bottomPlaceholder}
               </div>
             )}
           </Card>
+
+          <WildfireCard />
 
           <div className="text-xs text-slate-500">
             {active ? active.data_label : "SYNTHETIC DEMO DATA"}

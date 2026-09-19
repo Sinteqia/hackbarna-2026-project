@@ -107,6 +107,41 @@ export interface OptimizeResponse {
   message: string | null;
 }
 
+// POST /wildfire/optimize: Deepfire spatial signal + CONFIGURED operational rule (H9).
+export interface HotspotEvidence {
+  id: string;
+  distance_km: number;
+  observed_at: string;
+  confidence: string;
+  source: string;
+}
+
+export interface WildfireAssessment {
+  // APPLICABLE_SIGNAL | NO_APPLICABLE_SIGNAL | STALE_SIGNAL | UNAVAILABLE (never "low risk"/"safe")
+  status: string;
+  site_id: string;
+  data_source: string;
+  queried_at: string;
+  radius_km: number; // CONFIGURED demo parameter
+  fresh_hours: number; // CONFIGURED demo parameter
+  parameters_note: string;
+  hotspots_in_radius: number;
+  nearest_km: number | null;
+  latest_observed_at: string | null;
+  evidence: HotspotEvidence[];
+  affected_zone_ids: string[];
+  affected_task_ids: string[];
+  restriction: { from: string; to: string; outdoor_work_allowed: boolean; source: string; rule: string } | null;
+  rule_description: string;
+  disclaimer: string;
+  error: string | null;
+}
+
+// status may also be SIGNAL_UNAVAILABLE / SIGNAL_STALE (no plan is presented as wildfire-cleared).
+export interface WildfireResponse extends OptimizeResponse {
+  wildfire: WildfireAssessment;
+}
+
 // POST /replan: same shape, evaluated under the UPDATED context. `current_plan` is the previously
 // validated plan and `current_plan_validation` is that plan re-validated under the new context.
 export interface ReplanResponse extends OptimizeResponse {

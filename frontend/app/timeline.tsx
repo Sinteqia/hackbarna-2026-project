@@ -105,7 +105,7 @@ export default function Timeline({
                 </span>
               )}
             </div>
-            <div className="relative h-10">
+            <div className="relative h-9">
               {hours.map((h) => (
                 <div key={h} className="absolute inset-y-0 w-px bg-slate-100" style={{ left: pct(h * 60) }} />
               ))}
