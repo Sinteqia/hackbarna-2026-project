@@ -1,9 +1,16 @@
 from fastapi import FastAPI
 
 from app.demo_data import CURRENT_PLAN, DATA_LABEL, TASKS, WORKERS
-from app.models import DemoOptimizeResponse, ForecastResponse, ScheduleInput
+from app.models import (
+    DemoOptimizeResponse,
+    ForecastResponse,
+    ScheduleInput,
+    ValidateRequest,
+    ValidationResult,
+)
 from app.services.heat_risk import build_windows
 from app.services.scheduler import find_heat_conflicts, schedule
+from app.services.validator import validate_schedule
 from app.services.weather import get_forecast
 
 DISCLAIMER = (
@@ -36,6 +43,14 @@ def demo_optimize() -> DemoOptimizeResponse:
         current_plan=CURRENT_PLAN,
         current_plan_conflicts=find_heat_conflicts(CURRENT_PLAN, TASKS, windows),
         result=result,
+    )
+
+
+@app.post("/validate", response_model=ValidationResult)
+def validate(request: ValidateRequest) -> ValidationResult:
+    """Independently validate a candidate schedule against H1-H8."""
+    return validate_schedule(
+        request.candidate_schedule, request.workers, request.tasks, request.heat_windows
     )
 
 

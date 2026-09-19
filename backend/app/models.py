@@ -137,6 +137,30 @@ class ForecastResponse(BaseModel):
     risk_windows: list[HeatRiskWindow]
 
 
+# --- Independent validation (T3) ---
+
+
+class ValidationViolation(BaseModel):
+    constraint: str  # "H1".."H8", or "STRUCTURE" for unusable candidate data
+    code: str
+    message: str
+    task_id: str | None = None
+    worker_id: str | None = None
+
+
+class ValidationResult(BaseModel):
+    valid: bool
+    violations: list[ValidationViolation]
+    hard_constraints_checked: list[str]
+
+
+class ValidateRequest(BaseModel):
+    candidate_schedule: list[ScheduledTask]
+    workers: list[Worker]
+    tasks: list[Task]
+    heat_windows: list[HeatRiskWindow]
+
+
 class DemoOptimizeResponse(BaseModel):
     data_label: str
     weather_source: str
