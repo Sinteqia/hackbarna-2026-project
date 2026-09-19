@@ -69,10 +69,31 @@ export interface WorkerStatus {
   available: boolean; // false once the operator marked the worker unavailable
 }
 
+export type Environment = "OUTDOOR" | "PARTIAL" | "INDOOR";
+
+export interface ZoneView {
+  id: string;
+  name: string;
+  environment: Environment;
+}
+
+// Safe Site/WorkZone metadata owned by the backend (no scheduling constraints).
+export interface SiteView {
+  company_name: string;
+  id: string;
+  name: string;
+  location_name: string;
+  latitude: number;
+  longitude: number;
+  zones: ZoneView[];
+  task_zones: Record<string, string>; // task_id -> work_zone_id
+}
+
 export interface OptimizeResponse {
   scenario: string;
   data_label: string;
-  risk: { source: string; description: string; windows: HeatWindow[] };
+  risk: { site_id: string; source: string; description: string; windows: HeatWindow[] };
+  site: SiteView;
   workers: WorkerStatus[]; // backend-owned roster
   current_plan: ScheduledTask[];
   current_plan_conflicts: HeatConflict[];

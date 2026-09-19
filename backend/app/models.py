@@ -68,13 +68,38 @@ class Worker(BaseModel):
     available_to: str
 
 
+class Company(BaseModel):
+    id: str
+    name: str
+
+
+class Site(BaseModel):
+    """A construction site: the operational location that environmental data belongs to."""
+
+    id: str
+    name: str
+    location_name: str
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class WorkZone(BaseModel):
+    """An area of a site. It owns the environmental classification of the work done in it."""
+
+    id: str
+    site_id: str
+    name: str
+    environment: Environment
+
+
 class Task(BaseModel):
     id: str
     name: str
     duration_hours: int
     required_skill: str
     required_workers: int = 1
-    environment: Environment
+    work_zone_id: str  # the WorkZone the task is performed in
+    environment: Environment  # DERIVED from the WorkZone (see demo_data); H5 reads this value
     intensity: Intensity
     dependencies: list[str] = []  # ids of tasks that must finish first
     mandatory_deadline: str | None = None  # task must end by this time
@@ -177,7 +202,28 @@ class OptimizeRequest(BaseModel):
     scenario: Literal["baseline"]
 
 
+class ZoneView(BaseModel):
+    id: str
+    name: str
+    environment: Environment
+
+
+class SiteView(BaseModel):
+    """SAFE presentation metadata of the site: identity, location, zones and which zone each task
+    belongs to. No scheduling constraints."""
+
+    company_name: str
+    id: str
+    name: str
+    location_name: str
+    latitude: float
+    longitude: float
+    zones: list[ZoneView]
+    task_zones: dict[str, str]  # task_id -> work_zone_id
+
+
 class RiskContext(BaseModel):
+    site_id: str  # the site whose location these risk windows belong to
     source: str  # "fixture" (synthetic demo) | "open_meteo"
     description: str
     windows: list[HeatRiskWindow]
@@ -198,6 +244,7 @@ class OptimizeResponse(BaseModel):
     scenario: str
     data_label: str
     risk: RiskContext
+    site: SiteView
     workers: list[WorkerStatus]
     current_plan: list[ScheduledTask]
     current_plan_conflicts: list[HeatConflict]

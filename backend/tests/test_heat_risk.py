@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from app.demo_data import SITE
 from app.models import Risk, WeatherHour
 from app.services.heat_risk import build_windows, classify
 from app.services.weather import load_fixture
@@ -41,7 +42,7 @@ def test_missing_apparent_temperature_falls_back_to_temperature():
 
 
 def test_fixture_loads():
-    forecast = load_fixture()
+    forecast = load_fixture(SITE)
     assert forecast.source == "fixture"
     assert len(forecast.hours) == 11
     assert all(h.apparent_temperature_c is not None for h in forecast.hours)

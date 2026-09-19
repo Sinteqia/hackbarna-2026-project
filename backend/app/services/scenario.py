@@ -7,8 +7,19 @@ Risk windows are produced by the T1 engine (`build_windows`) - no thresholds are
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from app.demo_data import CURRENT_PLAN, DATA_LABEL, TASKS, WORKERS
-from app.models import RiskContext, ScheduledTask, Task, Worker, WorkerStatus
+from app.demo_data import COMPANY, CURRENT_PLAN, DATA_LABEL, SITE, TASKS, WORKERS, ZONES
+from app.models import (
+    Company,
+    RiskContext,
+    ScheduledTask,
+    Site,
+    SiteView,
+    Task,
+    Worker,
+    WorkerStatus,
+    WorkZone,
+    ZoneView,
+)
 from app.services.heat_risk import build_windows
 from app.services.weather import get_forecast
 
@@ -17,30 +28,52 @@ from app.services.weather import get_forecast
 class OperationalContext:
     scenario: str
     data_label: str
+    company: Company
+    site: Site
+    zones: list[WorkZone]
     workers: list[Worker]
     tasks: list[Task]
     current_plan: list[ScheduledTask]
-    risk: RiskContext
+    risk: RiskContext  # environmental risk windows for `site`
 
 
 def load_baseline_context() -> OperationalContext:
     # Reproducible demo: always the SYNTHETIC fixture weather (never presented as live data).
-    # Live Open-Meteo evidence is GET /forecast.
-    weather = get_forecast(demo=True)
+    # The forecast is requested for the Site's own coordinates; live Open-Meteo evidence for the
+    # same site is GET /forecast.
+    weather = get_forecast(SITE, demo=True)
     return OperationalContext(
         scenario="baseline",
         data_label=DATA_LABEL,
+        company=COMPANY,
+        site=SITE,
+        zones=list(ZONES),
         workers=list(WORKERS),
         tasks=list(TASKS),
         current_plan=list(CURRENT_PLAN),
         risk=RiskContext(
+            site_id=SITE.id,
             source=weather.source,
             description=(
-                "SYNTHETIC DEMO DATA fixture (not a live forecast). "
+                f"SYNTHETIC DEMO DATA fixture standing in for {SITE.name} (not a live forecast). "
                 "Prototype operational thresholds, not a certified WBGT."
             ),
             windows=build_windows(weather.hours),
         ),
+    )
+
+
+def site_view(context: OperationalContext) -> SiteView:
+    """Safe presentation metadata: site identity/location, zones, and each task's zone."""
+    return SiteView(
+        company_name=context.company.name,
+        id=context.site.id,
+        name=context.site.name,
+        location_name=context.site.location_name,
+        latitude=context.site.latitude,
+        longitude=context.site.longitude,
+        zones=[ZoneView(id=z.id, name=z.name, environment=z.environment) for z in context.zones],
+        task_zones={t.id: t.work_zone_id for t in context.tasks},
     )
 
 

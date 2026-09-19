@@ -11,8 +11,15 @@ interface Props {
   conflictIds?: Set<string>;
   conflictLabel?: string; // tag for rows in conflictIds (default H5 CONFLICT)
   changeLabels?: Map<string, string>; // task_id -> tag; when provided, other rows read UNCHANGED
+  taskZones?: Map<string, { name: string; environment: string }>; // task_id -> WorkZone (backend)
   hotWindows: HeatWindow[];
 }
+
+const ENV_STYLE: Record<string, string> = {
+  OUTDOOR: "bg-amber-100 text-amber-800",
+  PARTIAL: "bg-sky-100 text-sky-800",
+  INDOOR: "bg-slate-200 text-slate-700",
+};
 
 export default function Timeline({
   plan,
@@ -20,6 +27,7 @@ export default function Timeline({
   conflictIds,
   conflictLabel = "H5 CONFLICT",
   changeLabels,
+  taskZones,
   hotWindows,
 }: Props) {
   const start = 7 * 60;
@@ -39,7 +47,7 @@ export default function Timeline({
 
   return (
     <div className="text-sm">
-      <div className="grid grid-cols-[250px_minmax(0,1fr)]">
+      <div className="grid grid-cols-[290px_minmax(0,1fr)]">
         <div />
         <div className="relative h-6">
           {hours.map((h) => (
@@ -62,11 +70,25 @@ export default function Timeline({
             ? "bg-sky-600"
             : "bg-slate-600";
         return (
-          <div key={p.task_id} className="grid grid-cols-[250px_minmax(0,1fr)] border-t border-slate-200">
+          <div key={p.task_id} className="grid grid-cols-[290px_minmax(0,1fr)] border-t border-slate-200">
             <div className="flex items-center justify-between gap-2 py-0.5 pr-3">
               <div className="min-w-0">
                 <div className="font-semibold text-slate-900">{p.task_name}</div>
-                <div className="text-xs text-slate-500">{p.worker_name}</div>
+                <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                  <span className="truncate">
+                    {p.worker_name}
+                    {taskZones?.get(p.task_id) ? ` · ${taskZones.get(p.task_id)?.name}` : ""}
+                  </span>
+                  {taskZones?.get(p.task_id) && (
+                    <span
+                      className={`shrink-0 rounded px-1 text-[9px] font-bold ${
+                        ENV_STYLE[taskZones.get(p.task_id)!.environment] ?? ENV_STYLE.INDOOR
+                      }`}
+                    >
+                      {taskZones.get(p.task_id)!.environment}
+                    </span>
+                  )}
+                </div>
               </div>
               {conflict && (
                 <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-700">

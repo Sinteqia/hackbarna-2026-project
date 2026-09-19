@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 
+from app.demo_data import SITE
 from app.models import (
     DemoOptimizeResponse,
     ForecastResponse,
@@ -8,6 +9,7 @@ from app.models import (
     ReplanRequest,
     ReplanResponse,
     ScheduleInput,
+    SiteView,
     ValidateRequest,
     ValidationResult,
     WorkerStatus,
@@ -19,6 +21,7 @@ from app.services.scenario import (
     UnknownWorkerError,
     load_baseline_context,
     load_scenario,
+    site_view,
     worker_roster,
 )
 from app.services.scheduler import find_heat_conflicts, schedule
@@ -56,6 +59,15 @@ def demo_optimize() -> DemoOptimizeResponse:
         current_plan_conflicts=find_heat_conflicts(ctx.current_plan, ctx.tasks, ctx.risk.windows),
         result=result,
     )
+
+
+@app.get("/scenarios/{scenario}/site", response_model=SiteView)
+def scenario_site(scenario: str) -> SiteView:
+    """Safe Site/WorkZone metadata (name, location, zones, task->zone) for the UI."""
+    try:
+        return site_view(load_scenario(scenario))
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Unknown scenario {scenario!r}") from None
 
 
 @app.get("/scenarios/{scenario}/workers", response_model=list[WorkerStatus])
@@ -98,7 +110,7 @@ def validate(request: ValidateRequest) -> ValidationResult:
 @app.get("/forecast", response_model=ForecastResponse)
 def forecast(demo: bool = False) -> ForecastResponse:
     """Weather -> operational heat risk windows. `?demo=true` forces the synthetic fixture."""
-    weather = get_forecast(demo=demo)
+    weather = get_forecast(SITE, demo=demo)  # coordinates come from the backend-owned Site
     return ForecastResponse(
         location=weather.location,
         source=weather.source,

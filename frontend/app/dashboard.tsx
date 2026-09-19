@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { BASELINE_CONFLICT_IDS, BASELINE_HOT_WINDOWS, BASELINE_PLAN, BASELINE_WORKERS } from "@/lib/baseline";
 import { changeLabels, classify } from "@/lib/optimize";
-import type { OptimizeResponse, ReplanResponse, WorkerStatus } from "@/lib/types";
+import type { OptimizeResponse, ReplanResponse, SiteView, WorkerStatus } from "@/lib/types";
 import Timeline from "./timeline";
 import WorkersTable from "./workers-table";
 
@@ -63,8 +63,10 @@ export default function Dashboard() {
   // Worker the operator just marked unavailable, shown as UNAVAILABLE while the replan runs.
   const [pendingWorker, setPendingWorker] = useState<string | null>(null);
   const [baseRoster, setBaseRoster] = useState<WorkerStatus[]>(BASELINE_WORKERS);
+  const [baseSite, setBaseSite] = useState<SiteView | null>(null);
 
-  // Safe worker metadata from the backend, so the table is backend-sourced before any optimization.
+  // Safe backend metadata (workers, site/zones) so the screen is backend-sourced before any
+  // optimization. Falls back to display-only defaults if the backend is unreachable.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -75,6 +77,16 @@ export default function Dashboard() {
         if (!cancelled && Array.isArray(workers) && workers.length > 0) setBaseRoster(workers);
       } catch {
         /* keep the display-only fallback roster */
+      }
+    })();
+    (async () => {
+      try {
+        const res = await fetch("/api/site");
+        if (!res.ok) return;
+        const site = (await res.json()) as SiteView;
+        if (!cancelled && site && Array.isArray(site.zones)) setBaseSite(site);
+      } catch {
+        /* the header keeps its display-only fallback name */
       }
     })();
     return () => {
@@ -162,6 +174,18 @@ export default function Dashboard() {
   // UNAVAILABLE is shown ONLY once the backend has processed the event; while the request runs
   // the worker reads UPDATING…, and on a technical failure it stays AVAILABLE.
   const roster = active ? active.workers : baseRoster;
+
+  // Site / WorkZone metadata: the response's (authoritative) once a plan exists, else the fetched one.
+  const site = active ? active.site : baseSite;
+  const taskZones = site
+    ? new Map(
+        Object.entries(site.task_zones).flatMap(([taskId, zoneId]) => {
+          const zone = site.zones.find((z) => z.id === zoneId);
+          return zone ? [[taskId, { name: zone.name, environment: zone.environment }] as const] : [];
+        }),
+      )
+    : undefined;
+  const coord = (v: number, pos: string, neg: string) => `${Math.abs(v).toFixed(2)}°${v >= 0 ? pos : neg}`;
   // Interactive only after a validated baseline, and only until one event has been applied
   // (accumulating several unavailable workers is out of scope). Re-running OPTIMIZE PLAN or
   // reloading starts a fresh run from the synthetic baseline.
@@ -184,7 +208,12 @@ export default function Dashboard() {
         <div>
           <div className="text-2xl font-extrabold tracking-tight">Operational Adaptation</div>
           <div className="mt-0.5 flex items-center gap-3 text-sm text-slate-300">
-            <span>Construction site · Barcelona</span>
+            <span>{site ? site.name : "Construction Site — Barcelona"}</span>
+            {site && (
+              <span className="font-mono text-xs text-slate-400">
+                {coord(site.latitude, "N", "S")} {coord(site.longitude, "E", "W")}
+              </span>
+            )}
             <span className="rounded border border-amber-400/60 px-2 py-0.5 text-xs font-semibold text-amber-300">
               Synthetic operational scenario
             </span>
@@ -250,6 +279,7 @@ export default function Dashboard() {
               order={order}
               conflictIds={rd ? violatedIds : replanLoading ? new Set() : conflictIds}
               conflictLabel={rd ? violatedLabel : undefined}
+              taskZones={taskZones}
               hotWindows={hotWindows}
             />
           </Card>
@@ -259,7 +289,13 @@ export default function Dashboard() {
             badge={activeValidated && !replanLoading ? <Pill tone="green">VALIDATED</Pill> : undefined}
           >
             {activeValidated && !replanLoading ? (
-              <Timeline plan={active.schedule} order={order} changeLabels={changeLabels(active.changes)} hotWindows={hotWindows} />
+              <Timeline
+                plan={active.schedule}
+                order={order}
+                changeLabels={changeLabels(active.changes)}
+                taskZones={taskZones}
+                hotWindows={hotWindows}
+              />
             ) : (
               <div className="flex h-44 items-center justify-center rounded border border-dashed border-slate-300 text-slate-500">
                 {bottomPlaceholder}

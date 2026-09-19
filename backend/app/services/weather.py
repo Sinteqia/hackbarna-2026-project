@@ -8,11 +8,8 @@ from pathlib import Path
 
 import httpx
 
-from app.models import WeatherForecast, WeatherHour
+from app.models import Site, WeatherForecast, WeatherHour
 
-LOCATION_NAME = "Barcelona"
-LATITUDE = 41.3874
-LONGITUDE = 2.1686
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEOUT_SECONDS = 5.0
 FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "barcelona_forecast_demo.json"
@@ -43,19 +40,20 @@ def parse_open_meteo(payload: dict) -> list[WeatherHour]:
     return hours
 
 
-def load_fixture() -> WeatherForecast:
+def load_fixture(site: Site) -> WeatherForecast:
+    """The synthetic demo fixture, labelled with the site it stands in for."""
     payload = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
     return WeatherForecast(
-        location=LOCATION_NAME, source="fixture", hours=parse_open_meteo(payload)
+        location=site.location_name, source="fixture", hours=parse_open_meteo(payload)
     )
 
 
-def fetch_open_meteo() -> WeatherForecast:
+def fetch_open_meteo(site: Site) -> WeatherForecast:
     response = httpx.get(
         OPEN_METEO_URL,
         params={
-            "latitude": LATITUDE,
-            "longitude": LONGITUDE,
+            "latitude": site.latitude,
+            "longitude": site.longitude,
             "hourly": "temperature_2m,apparent_temperature,relative_humidity_2m",
             "timezone": "Europe/Madrid",
             "forecast_days": 1,
@@ -64,17 +62,18 @@ def fetch_open_meteo() -> WeatherForecast:
     )
     response.raise_for_status()
     return WeatherForecast(
-        location=LOCATION_NAME, source="open_meteo", hours=parse_open_meteo(response.json())
+        location=site.location_name, source="open_meteo", hours=parse_open_meteo(response.json())
     )
 
 
-def get_forecast(demo: bool = False) -> WeatherForecast:
-    """Return a forecast. `demo=True` forces the fixture; a live failure falls back to it."""
+def get_forecast(site: Site, demo: bool = False) -> WeatherForecast:
+    """Forecast for a Site's coordinates. `demo=True` forces the fixture; a live failure falls
+    back to it (reported in `fallback_reason`)."""
     if demo:
-        return load_fixture()
+        return load_fixture(site)
     try:
-        return fetch_open_meteo()
+        return fetch_open_meteo(site)
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
-        forecast = load_fixture()
+        forecast = load_fixture(site)
         forecast.fallback_reason = f"open_meteo failed: {type(exc).__name__}: {exc}"
         return forecast

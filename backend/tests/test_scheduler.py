@@ -3,7 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.demo_data import CURRENT_PLAN, TASKS, WORKERS
+from app.demo_data import CURRENT_PLAN, SITE, TASKS, WORKERS
 from app.main import app
 from app.models import ScheduleInput
 from app.services.heat_risk import build_windows
@@ -21,7 +21,7 @@ def h(hhmm: str) -> int:
 @pytest.fixture(scope="module")
 def heat_windows():
     # Single source of truth: T1 engine on the synthetic fixture.
-    return build_windows(load_fixture().hours)
+    return build_windows(load_fixture(SITE).hours)
 
 
 @pytest.fixture(scope="module")
