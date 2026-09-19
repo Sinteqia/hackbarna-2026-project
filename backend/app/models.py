@@ -116,10 +116,25 @@ class ScheduledTask(BaseModel):
     end: str
 
 
+class WildfireRestriction(BaseModel):
+    """CONFIGURED operational rule derived from an applicable environmental signal (Deepfire).
+    It is an operational rule of this prototype, not a legal prohibition and not a Deepfire
+    statement. `to` is exclusive."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_time: str = Field(alias="from")  # "HH:MM"
+    to_time: str = Field(alias="to")
+    outdoor_work_allowed: bool = False
+    source: str = "deepfire"
+    rule: str = ""  # human-readable description of the configured rule
+
+
 class ScheduleInput(BaseModel):
     workers: list[Worker]
     tasks: list[Task]
     heat_windows: list[HeatRiskWindow]  # produced by the T1 Heat Risk Engine
+    wildfire_restrictions: list[WildfireRestriction] = []  # H9; empty = none applied
     current_plan: list[ScheduledTask] = []
 
 
@@ -293,6 +308,56 @@ class ReplanResponse(OptimizeResponse):
     re-validated under the updated context, and `schedule`/`validation` are the replan."""
 
     event: AppliedEvent
+
+
+# --- Norrsken / Deepfire wildfire signal (configured operational rule, not a safety statement) ---
+
+
+class HotspotEvidence(BaseModel):
+    """Public satellite detection metadata. A hotspot is a candidate fire signal, NOT a confirmed fire."""
+
+    id: str
+    distance_km: float
+    observed_at: str
+    confidence: str
+    source: str
+
+
+class WildfireAssessment(BaseModel):
+    # APPLICABLE_SIGNAL | NO_APPLICABLE_SIGNAL | STALE_SIGNAL | UNAVAILABLE
+    # NO_APPLICABLE_SIGNAL, STALE_SIGNAL and UNAVAILABLE never mean "low risk" or "safe".
+    status: str
+    site_id: str
+    data_source: str
+    queried_at: str
+    # CONFIGURED DEMO OPERATIONAL RULE PARAMETERS: not Deepfire recommendations, legal thresholds,
+    # wildfire safety distances or official exclusion zones (see `parameters_note`).
+    radius_km: float  # configured applicability radius around the site
+    fresh_hours: int  # configured observation window
+    parameters_note: str
+    hotspots_in_radius: int
+    nearest_km: float | None = None
+    latest_observed_at: str | None = None
+    evidence: list[HotspotEvidence] = []
+    affected_zone_ids: list[str] = []
+    affected_task_ids: list[str] = []
+    restriction: WildfireRestriction | None = None
+    rule_description: str
+    disclaimer: str
+    error: str | None = None  # error TYPE only; never credentials or tokens
+
+
+class WildfireOptimizeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scenario: Literal["baseline"]
+
+
+class WildfireOptimizeResponse(OptimizeResponse):
+    """OptimizeResponse evaluated under the wildfire assessment. status may also be
+    SIGNAL_UNAVAILABLE / SIGNAL_STALE: no plan is presented as wildfire-cleared in those cases."""
+
+    wildfire: WildfireAssessment
 
 
 class DemoOptimizeResponse(BaseModel):

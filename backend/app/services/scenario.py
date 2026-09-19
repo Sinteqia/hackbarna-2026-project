@@ -15,6 +15,7 @@ from app.models import (
     Site,
     SiteView,
     Task,
+    WildfireRestriction,
     Worker,
     WorkerStatus,
     WorkZone,
@@ -35,6 +36,8 @@ class OperationalContext:
     tasks: list[Task]
     current_plan: list[ScheduledTask]
     risk: RiskContext  # environmental risk windows for `site`
+    # None = no wildfire assessment took part; a list (maybe empty) = it did (H9 is then checked).
+    wildfire_restrictions: list[WildfireRestriction] | None = None
 
 
 def load_baseline_context() -> OperationalContext:

@@ -117,6 +117,11 @@ def schedule(data: ScheduleInput) -> ScheduleResult:
             raise ValueError(f"Task {t.id} depends on unknown task(s): {unknown}")
 
     forbidden = prohibited_windows(data.heat_windows)
+    wildfire_forbidden = [  # H9 slot ranges
+        (hhmm_to_slot(r.from_time), hhmm_to_slot(r.to_time))
+        for r in data.wildfire_restrictions
+        if not r.outdoor_work_allowed
+    ]
     model = cp_model.CpModel()
     starts: dict[str, cp_model.IntVar] = {}
     max_start_sum = 0  # max possible value of sum(starts): each start is bounded by HORIZON - d
@@ -152,6 +157,12 @@ def schedule(data: ScheduleInput) -> ScheduleResult:
         if is_heat_restricted(t):  # H5: finish before the window or start after it
             for i, (_, a, b) in enumerate(forbidden):
                 before = model.NewBoolVar(f"before_{t.id}_{i}")
+                model.Add(start + d <= a).OnlyEnforceIf(before)
+                model.Add(start >= b).OnlyEnforceIf(before.Not())
+
+        if t.environment == Environment.OUTDOOR:  # H9: configured wildfire restriction, any intensity
+            for i, (a, b) in enumerate(wildfire_forbidden):
+                before = model.NewBoolVar(f"wf_before_{t.id}_{i}")
                 model.Add(start + d <= a).OnlyEnforceIf(before)
                 model.Add(start >= b).OnlyEnforceIf(before.Not())
 

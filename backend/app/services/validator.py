@@ -20,6 +20,7 @@ from app.models import (
     Task,
     ValidationResult,
     ValidationViolation,
+    WildfireRestriction,
     Worker,
 )
 
@@ -50,7 +51,10 @@ def validate_schedule(
     workers: list[Worker],
     tasks: list[Task],
     heat_windows: list[HeatRiskWindow],
+    wildfire_restrictions: list[WildfireRestriction] | None = None,
 ) -> ValidationResult:
+    """`wildfire_restrictions=None` means no wildfire assessment took part (H9 not checked);
+    a list (possibly empty) means it did, so H9 is reported as checked."""
     violations: list[ValidationViolation] = []
 
     def add(constraint: str, code: str, message: str, task_id=None, worker_id=None) -> None:
@@ -158,6 +162,22 @@ def validate_schedule(
                         f"{window.from_time}-{window.to_time} where outdoor high-intensity work is not allowed",
                         task_id=a.task_id, worker_id=a.worker_id)
 
+        # H9 configured wildfire restriction (only when a wildfire assessment was supplied):
+        # OUTDOOR work, any intensity, must not overlap a restricted window. It is a configured
+        # operational rule derived from an applicable Deepfire signal, not a legal prohibition.
+        if wildfire_restrictions and task.environment == Environment.OUTDOOR:
+            for restriction in wildfire_restrictions:
+                if restriction.outdoor_work_allowed:
+                    continue
+                r_start, r_end = _minutes(restriction.from_time), _minutes(restriction.to_time)
+                if r_start is None or r_end is None:
+                    continue
+                if a.start < r_end and r_start < a.end:
+                    add("H9", "WILDFIRE_RESTRICTION_OVERLAP",
+                        f"{task.name} (OUTDOOR) overlaps the configured wildfire operational restriction "
+                        f"{restriction.from_time}-{restriction.to_time}",
+                        task_id=a.task_id, worker_id=a.worker_id)
+
     # H3 required workers: distinct workers per task
     for task_id, group in by_task.items():
         distinct = len({a.worker_id for a in group})
@@ -193,5 +213,7 @@ def validate_schedule(
                         task_id=second.task_id, worker_id=worker_id)
 
     return ValidationResult(
-        valid=not violations, violations=violations, hard_constraints_checked=list(HARD_CONSTRAINTS)
+        valid=not violations,
+        violations=violations,
+        hard_constraints_checked=list(HARD_CONSTRAINTS) + (["H9"] if wildfire_restrictions is not None else []),
     )

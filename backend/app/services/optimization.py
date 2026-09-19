@@ -18,18 +18,21 @@ def run_optimization(
     validator_fn: Callable = validate_schedule,
 ) -> OptimizeResponse:
     windows = context.risk.windows
-    current_validation = validator_fn(context.current_plan, context.workers, context.tasks, windows)
+    # H9 is passed to the validator only when a wildfire assessment took part (baseline: unchanged).
+    extra = {} if context.wildfire_restrictions is None else {"wildfire_restrictions": context.wildfire_restrictions}
+    current_validation = validator_fn(context.current_plan, context.workers, context.tasks, windows, **extra)
     result = scheduler_fn(
         ScheduleInput(
             workers=context.workers, tasks=context.tasks,
             heat_windows=windows, current_plan=context.current_plan,
+            wildfire_restrictions=context.wildfire_restrictions or [],
         )
     )
 
     status, message = result.status, result.message
     schedule_out, changes, validation, validated = result.schedule, result.changes, None, False
     if result.status == "FEASIBLE":
-        validation = validator_fn(result.schedule, context.workers, context.tasks, windows)
+        validation = validator_fn(result.schedule, context.workers, context.tasks, windows, **extra)
         validated = validation.valid
         if not validated:
             status = "VALIDATION_FAILED"

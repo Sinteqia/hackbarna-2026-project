@@ -12,6 +12,8 @@ from app.models import (
     SiteView,
     ValidateRequest,
     ValidationResult,
+    WildfireOptimizeRequest,
+    WildfireOptimizeResponse,
     WorkerStatus,
 )
 from app.services.heat_risk import build_windows
@@ -26,6 +28,7 @@ from app.services.scenario import (
 )
 from app.services.scheduler import find_heat_conflicts, schedule
 from app.services.validator import validate_schedule
+from app.services.wildfire import run_wildfire_optimization
 from app.services.weather import get_forecast
 
 DISCLAIMER = (
@@ -85,6 +88,14 @@ def optimize(request: OptimizeRequest) -> OptimizeResponse:
     """Frontend-facing flow. The backend owns workers/tasks/plan/risk windows; the client only
     names a scenario. Solver output is independently validated before being exposed."""
     return run_optimization(load_scenario(request.scenario))
+
+
+@app.post("/wildfire/optimize", response_model=WildfireOptimizeResponse)
+def wildfire_optimize(request: WildfireOptimizeRequest) -> WildfireOptimizeResponse:
+    """Norrsken flow: the BACKEND queries Deepfire for the Site's location, applies the configured
+    wildfire operational rule (H9) and optimizes + independently validates under it. The client
+    only names the scenario; it can neither supply nor override the signal or the rule."""
+    return run_wildfire_optimization(request.scenario)
 
 
 @app.post("/replan", response_model=ReplanResponse)
