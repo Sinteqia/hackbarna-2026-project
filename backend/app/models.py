@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -159,6 +160,44 @@ class ValidateRequest(BaseModel):
     workers: list[Worker]
     tasks: list[Task]
     heat_windows: list[HeatRiskWindow]
+
+
+# --- Trusted optimization flow (T4). The backend owns the whole operational context. ---
+
+
+class OptimizeRequest(BaseModel):
+    """Deliberately tiny: it only names a backend-owned scenario.
+
+    Any other field (workers, tasks, current_plan, heat_windows, constraints, status...) is
+    rejected (422) instead of being silently ignored or trusted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    scenario: Literal["baseline"]
+
+
+class RiskContext(BaseModel):
+    source: str  # "fixture" (synthetic demo) | "open_meteo"
+    description: str
+    windows: list[HeatRiskWindow]
+
+
+class OptimizeResponse(BaseModel):
+    scenario: str
+    data_label: str
+    risk: RiskContext
+    current_plan: list[ScheduledTask]
+    current_plan_conflicts: list[HeatConflict]
+    current_plan_validation: ValidationResult
+    # "FEASIBLE" | "INFEASIBLE" | "UNKNOWN" (solver) | "VALIDATION_FAILED" (candidate rejected)
+    status: str
+    solver: str
+    validated: bool  # True only if a candidate exists AND the independent validator accepted it
+    schedule: list[ScheduledTask]  # empty unless validated
+    changes: list[Change]
+    validation: ValidationResult | None = None  # None when the solver produced no candidate
+    message: str | None = None
 
 
 class DemoOptimizeResponse(BaseModel):
