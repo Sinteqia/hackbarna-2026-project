@@ -1,0 +1,33 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Pre-hackathon docs (not code)
+/*.docx
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
