@@ -44,6 +44,90 @@ class WeatherForecast(BaseModel):
     hours: list[WeatherHour]
 
 
+# --- Scheduling (T2). All times are "HH:MM" on hourly boundaries. ---
+
+
+class Environment(str, Enum):
+    OUTDOOR = "OUTDOOR"
+    PARTIAL = "PARTIAL"
+    INDOOR = "INDOOR"
+
+
+class Intensity(str, Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
+class Worker(BaseModel):
+    id: str
+    name: str
+    skills: list[str]
+    available_from: str
+    available_to: str
+
+
+class Task(BaseModel):
+    id: str
+    name: str
+    duration_hours: int
+    required_skill: str
+    required_workers: int = 1
+    environment: Environment
+    intensity: Intensity
+    dependencies: list[str] = []  # ids of tasks that must finish first
+    mandatory_deadline: str | None = None  # task must end by this time
+
+
+class ScheduledTask(BaseModel):
+    """One task assigned to one worker. A task needing N workers yields N entries."""
+
+    task_id: str
+    task_name: str
+    worker_id: str
+    worker_name: str
+    start: str
+    end: str
+
+
+class ScheduleInput(BaseModel):
+    workers: list[Worker]
+    tasks: list[Task]
+    heat_windows: list[HeatRiskWindow]  # produced by the T1 Heat Risk Engine
+    current_plan: list[ScheduledTask] = []
+
+
+class Change(BaseModel):
+    task_id: str
+    task_name: str
+    old_start: str
+    old_end: str
+    new_start: str
+    new_end: str
+    old_worker_id: str
+    new_worker_id: str
+    worker_changed: bool
+
+
+class ScheduleResult(BaseModel):
+    status: str  # "FEASIBLE" | "INFEASIBLE" | "UNKNOWN"
+    solver: str
+    schedule: list[ScheduledTask]
+    changes: list[Change]
+    violations: list[str]
+    message: str | None = None
+
+
+class HeatConflict(BaseModel):
+    task_id: str
+    task_name: str
+    start: str
+    end: str
+    window_from: str
+    window_to: str
+    risk: Risk
+
+
 class ForecastResponse(BaseModel):
     location: str
     source: str
@@ -51,3 +135,12 @@ class ForecastResponse(BaseModel):
     disclaimer: str
     hourly: list[WeatherHour]
     risk_windows: list[HeatRiskWindow]
+
+
+class DemoOptimizeResponse(BaseModel):
+    data_label: str
+    weather_source: str
+    heat_windows: list[HeatRiskWindow]
+    current_plan: list[ScheduledTask]
+    current_plan_conflicts: list[HeatConflict]
+    result: ScheduleResult
