@@ -76,8 +76,10 @@ export default function Dashboard() {
         if (!res.ok) return;
         const workers = (await res.json()) as WorkerStatus[];
         if (!cancelled && Array.isArray(workers) && workers.length > 0) setBaseRoster(workers);
-      } catch {
-        /* keep the display-only fallback roster */
+      } catch (error) {
+        // Recommended by Norma — fixed with Claude Sonnet 5 via Claude Code
+        // keep the display-only fallback roster, but leave a trace of why
+        console.warn("Could not load the worker roster from the backend; using the display-only fallback.", error);
       }
     })();
     (async () => {
@@ -86,8 +88,10 @@ export default function Dashboard() {
         if (!res.ok) return;
         const site = (await res.json()) as SiteView;
         if (!cancelled && site && Array.isArray(site.zones)) setBaseSite(site);
-      } catch {
-        /* the header keeps its display-only fallback name */
+      } catch (error) {
+        // Recommended by Norma — fixed with Claude Sonnet 5 via Claude Code
+        // the header keeps its display-only fallback name, but leave a trace of why
+        console.warn("Could not load the site metadata from the backend; using the display-only fallback.", error);
       }
     })();
     return () => {
