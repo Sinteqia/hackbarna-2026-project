@@ -66,6 +66,18 @@ def fetch_open_meteo(site: Site) -> WeatherForecast:
     )
 
 
+def _safe_fallback_reason(exc: Exception) -> str:
+    """Fixed, user-safe reason for a live failure. The exception text itself is never returned:
+    it can carry the request URL (with the site's coordinates) or internal parsing details."""
+    if isinstance(exc, httpx.TimeoutException):
+        return "open_meteo failed: request timed out"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"open_meteo failed: HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.HTTPError):
+        return "open_meteo failed: network error"
+    return "open_meteo failed: unexpected response format"
+
+
 def get_forecast(site: Site, demo: bool = False) -> WeatherForecast:
     """Forecast for a Site's coordinates. `demo=True` forces the fixture; a live failure falls
     back to it (reported in `fallback_reason`)."""
@@ -75,5 +87,6 @@ def get_forecast(site: Site, demo: bool = False) -> WeatherForecast:
         return fetch_open_meteo(site)
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         forecast = load_fixture(site)
-        forecast.fallback_reason = f"open_meteo failed: {type(exc).__name__}: {exc}"
+        # Recommended by Norma — fixed with Claude Sonnet 5 via Claude Code
+        forecast.fallback_reason = _safe_fallback_reason(exc)
         return forecast
